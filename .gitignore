@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/
+
+# Excel 临时文件
+~$*.xlsx
+~$*.xls
+*.xlk
+
+# 项目特定输出文件
+formula_analysis.txt
+input_cells.txt
+output_cells.txt
+output_formulas.txt
+formula_analysis_result.xlsx
+*.log
+
+# 操作系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 调试文件
+.ipynb_checkpoints/
+*.ipynb
+.pytest_cache/
+.coverage
+htmlcov/ 

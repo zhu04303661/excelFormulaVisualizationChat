@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Excel公式依赖关系图</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        .node circle {
+            fill: #fff;
+            stroke: #4682B4;
+            stroke-width: 2px;
+            cursor: pointer;
+        }
+
+        .node text {
+            font: 12px sans-serif;
+        }
+
+        .link {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 1.5px;
+        }
+
+        #container {
+            width: 100%;
+            height: 100vh;
+            overflow: auto;
+            position: relative;
+        }
+
+        #container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        #container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        #container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        #container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        svg {
+            min-width: 100%;
+            min-height: 100%;
+        }
+
+        .node--internal circle {
+            fill: #54b446;
+        }
+
+        .node--internal circle:hover {
+            fill: #666;
+        }
+
+        .node--collapsed circle {
+            fill: lightsteelblue;
+        }
+            /* 添加tooltip样式 */
+        .tooltip {
+            position: absolute;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            max-width: 300px;
+            white-space: pre-wrap;
+            z-index: 1000;
+        }
+        
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: transparent transparent rgba(0, 0, 0, 0.8) transparent;
+        }
+
+        /* 添加全局控制按钮样式 */
+        .control-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: #4682B4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        
+        .control-button:hover {
+            background: #36648B;
+        }
+
+        /* 修改控制按钮组样式 */
+        .control-buttons {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px;
+            border-radius: 4px;
+        }
+        
+        .control-button {
+            padding: 8px 16px;
+            background: #4682B4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(70, 130, 180, 0.2);
+        }
+        
+        .control-button:hover {
+            background: #36648B;
+            box-shadow: 0 4px 8px rgba(70, 130, 180, 0.3);
+        }
+
+        .control-button:active {
+            background: #27496D;
+            transform: translateY(1px);
+        }
+
+        .center-button {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .center-button svg {
+            width: 14px;
+            height: 14px;
+            fill: white;
+        }
+
+        /* 确保样式优先级足够高 */
+        body .control-buttons {
+            position: fixed !important;
+            bottom: 20px !important;
+            right: 20px !important;
+            display: flex !important;
+            gap: 10px;
+            z-index: 1000 !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px;
+            border-radius: 4px;
+            pointer-events: auto;  /* 确保按钮可点击 */
+        }
+        
+        body .control-button {
+            padding: 8px 16px;
+            background: #4682B4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(70, 130, 180, 0.2);
+            pointer-events: auto;  /* 确保按钮可点击 */
+            display: inline-block;  /* 确保按钮正确显示 */
+        }
+
+        /* 修改悬浮按钮样式以适应文字 */
+        .float-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            height: 40px;
+            padding: 0 24px;
+            min-width: 120px;      /* 调整最小宽度 */
+            background: #4682B4;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            border: none;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            white-space: nowrap;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .float-button:hover {
+            background: #36648B;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .float-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 添加右上角按钮样式 */
+        .top-right-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            height: 40px;
+            padding: 0 24px;
+            min-width: 120px;
+            background: #4682B4;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            border: none;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            white-space: nowrap;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .top-right-button:hover {
+            background: #36648B;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .top-right-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <script>
+        // Sample data structure
+        const sampleData = {};
+        // 设置固定的节点大小和间距
+        const nodeWidth = 300;  // 节点宽度
+        const nodeHeight = 50;  // 节点高度
+        const minNodeDistance = 50;  // 最小垂直间距
+
+        function calculateTreeSize(root) {
+            let visibleNodes = 0;
+            let maxDepth = 0;
+            
+            // 计算可见节点数量和最大深度
+            root.each(d => {
+                if (d.children) {
+                    visibleNodes++;
+                    maxDepth = Math.max(maxDepth, d.depth);
+                }
+            });
+
+            // 确保有最小值
+            visibleNodes = Math.max(visibleNodes, 1);
+            maxDepth = Math.max(maxDepth, 1);
+
+            // 计算所需的总高度和宽度
+            const totalHeight = (visibleNodes + 1) * nodeHeight * 2;  // 2倍节点高度作为间距
+            const totalWidth = (maxDepth + 1) * nodeWidth * 1.5;  // 1.5倍节点宽度作为水平间距
+
+            return [totalHeight, totalWidth];
+        }
+
+        // 设置画布尺寸
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        
+        // 创建树形布局
+        const treeLayout = d3.tree()
+            .nodeSize([nodeHeight * 2, nodeWidth * 1.5])  // 设置固定的节点大小
+            .separation((a, b) => {
+                return (a.parent == b.parent ? 1.5 : 2);  // 增加不同父节点之间的间距
+            });
+           // .size([height - 100, width - 200]);
+
+        // 创建SVG容器
+        const svg = d3.select("#container")
+            .append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .append("g")
+            .attr("transform", "translate(100, 50)");
+
+        // 创建缩放行为
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", (event) => {
+                svg.attr("transform", event.transform);
+            });
+
+        // 应用缩放行为到SVG容器
+        d3.select("#container > svg").call(zoom);
+
+        // 创建层次结构
+        const root = d3.hierarchy(sampleData);
+        
+        // 存储初始展开状态
+        root.descendants().forEach(d => {
+            d._children = d.children;
+        });
+
+        // 更新树的可视化
+        function update(source) {
+            const [treeHeight, treeWidth] = calculateTreeSize(root);        
+            treeLayout.size([treeHeight, treeWidth]);    
+
+            const nodes = treeLayout(root);
+            const links = nodes.links();
+            
+            // 更新连接线
+            const link = svg.selectAll(".link")
+                .data(links, d => d.target.id || (d.target.id = Math.random()));
+
+            // 入场动画的连接线
+            const linkEnter = link.enter()
+                .append("path")
+                .attr("class", "link")
+                .attr("d", d3.linkHorizontal()
+                    .x(d => d.y)
+                    .y(d => d.x));
+
+            // 更新现有连接线
+            link.merge(linkEnter)
+                .transition()
+                .duration(500)
+                .attr("d", d3.linkHorizontal()
+                    .x(d => d.y)
+                    .y(d => d.x));
+
+            // 移除不需要的连接线
+            link.exit()
+                .transition()
+                .duration(500)
+                .style("opacity", 0)
+                .remove();
+
+            // 更新节点
+            const node = svg.selectAll(".node")
+                .data(nodes.descendants(), d => d.id || (d.id = Math.random()));
+
+            // 创建新节点
+            const nodeEnter = node.enter()
+                .append("g")
+                .attr("class", d => "node" + (d.children || d._children ? " node--internal" : " node--leaf"))
+                .attr("transform", d => `translate(${source.y0 || source.y},${source.x0 || source.x})`);
+
+            // 添加节点圆圈
+            nodeEnter.append("circle")
+                .attr("r", 20)
+                .on("click", (event, d) => {
+                    if (d.children) {
+                        d._children = d.children;
+                        d.children = null;
+                    } else {
+                        d.children = d._children;
+                        d._children = null;
+                    }
+                    update(d);
+                });
+
+            // 添加节点文本
+            nodeEnter.append("text")
+                .attr("dx", d => d.children || d._children ? -8 : 8)
+                .attr("dy", 3)
+                .style("text-anchor", d => d.children || d._children ? "end" : "start")
+                .text(d => d.data.brief);
+
+            // 更新现有节点位置
+            const nodeUpdate = node.merge(nodeEnter)
+                .transition()
+                .duration(500)
+                .attr("transform", d => `translate(${d.y},${d.x})`);
+
+            // 更新节点样式
+            nodeUpdate.select("circle")
+                .attr("class", d => d._children ? "collapsed" : "")
+                .attr("r", 20);
+
+            // 移除不需要的节点
+            const nodeExit = node.exit()
+                .transition()
+                .duration(500)
+                .attr("transform", d => `translate(${source.y},${source.x})`)
+                .remove();
+
+            // 存储当前位置用于后续动画
+            nodes.descendants().forEach(d => {
+                d.x0 = d.x;
+                d.y0 = d.y;
+            });
+        }
+
+        // 初始化树状图
+        root.x0 = height / 2;
+        root.y0 = 0;
+        update(root);
+
+        // 自适应布局
+        function resize() {
+            const [treeHeight, treeWidth] = calculateTreeSize(root); 
+            update(root);
+        }
+
+        // 监听窗口大小变化
+        window.addEventListener('resize', resize);
+
+        // 创建纯文字悬浮按钮
+        const floatButton = d3.select("body")
+            .append("button")
+            .attr("class", "float-button")
+            .text("返回根节点")    // 只使用文字
+            .on("click", centerRoot);
+
+        // 定位到根节点的函数
+        function centerRoot() {
+            // 获取SVG的尺寸
+            const svgElement = d3.select("#container > svg").node();
+            const svgWidth = svgElement.clientWidth;
+            const svgHeight = svgElement.clientHeight;
+            
+            // 计算缩放比例和位移
+            const scale = 0.8;  // 缩放级别
+            const x = svgWidth / 2;
+            const y = svgHeight / 4;  // 调整垂直位置，使根节点在视图上部
+            
+            // 创建转换矩阵
+            const transform = d3.zoomIdentity
+                .translate(x, y)
+                .scale(scale)
+                .translate(-root.y, -root.x);
+            
+            // 应用平滑动画
+            d3.select("#container > svg")
+                .transition()
+                .duration(750)  // 动画持续750ms
+                .ease(d3.easeCubicInOut)  // 使用平滑的缓动函数
+                .call(zoom.transform, transform);
+        }
+
+        // 在页面加载完成后自动定位到根节点
+        setTimeout(centerRoot, 100);
+
+        // 创建右上角的切换详情按钮
+        let isDetailView = false; // 用于跟踪当前显示状态
+        
+        const detailButton = d3.select("body")
+            .append("button")
+            .attr("class", "top-right-button")
+            .text("显示详情")
+            .on("click", function() {
+                isDetailView = !isDetailView; // 切换状态
+                
+                // 更新所有节点的文本
+                svg.selectAll(".node text")
+                    .text(d => isDetailView ? d.data.detail : d.data.brief);
+                    
+                // 更新按钮文本
+                d3.select(this)
+                    .text(isDetailView ? "显示简略" : "显示详情");
+            });
+    </script>
+</body>
+</html>
+
+
+
